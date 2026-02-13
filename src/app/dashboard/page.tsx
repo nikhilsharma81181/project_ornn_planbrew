@@ -11,6 +11,7 @@ import { SearchAndExport } from "@/components/SearchAndExport";
 import { onAuthChange } from "@/lib/firebase";
 import { api } from "@/lib/api";
 import { getWeekRange } from "@/lib/utils";
+import { InsightCard, Insight } from "@/components/InsightCard";
 import Link from "next/link";
 
 interface ActivityItem {
@@ -45,6 +46,7 @@ export default function DashboardPage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [feed, setFeed] = useState<FeedResponse | null>(null);
   const [filteredActivities, setFilteredActivities] = useState<ActivityItem[] | null>(null);
+  const [insight, setInsight] = useState<Insight | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Auth check
@@ -106,9 +108,21 @@ export default function DashboardPage() {
     }
   }, [projectId, weekStartISO, weekEndISO]);
 
+  // Fetch latest insight
+  const fetchInsight = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const data = await api.get<Insight>(`/insights/${projectId}/latest`);
+      setInsight(data);
+    } catch {
+      // No insight available — that's fine
+    }
+  }, [projectId]);
+
   useEffect(() => {
     fetchFeed();
-  }, [fetchFeed]);
+    fetchInsight();
+  }, [fetchFeed, fetchInsight]);
 
   if (!authChecked) {
     return (
@@ -145,6 +159,9 @@ export default function DashboardPage() {
         ) : feed && feed.activities.length > 0 ? (
           <div className="space-y-6">
             <WeeklyStats stats={feed.stats} />
+            {insight && (
+              <InsightCard insight={insight} onRead={() => setInsight({ ...insight, isRead: true })} />
+            )}
             <div>
               <h2 className="text-sm font-medium text-muted-foreground mb-3">Activity</h2>
               <SearchAndExport
