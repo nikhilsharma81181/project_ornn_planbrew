@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { WeekNavigation } from "@/components/WeekNavigation";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { WeeklyStats } from "@/components/WeeklyStats";
+import { SearchAndExport } from "@/components/SearchAndExport";
 import { onAuthChange } from "@/lib/firebase";
 import { api } from "@/lib/api";
 import { getWeekRange } from "@/lib/utils";
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [feed, setFeed] = useState<FeedResponse | null>(null);
+  const [filteredActivities, setFilteredActivities] = useState<ActivityItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Auth check
@@ -92,6 +94,7 @@ export default function DashboardPage() {
         `/progress/${projectId}/activity-feed?from=${weekStartISO}&to=${weekEndISO}&limit=100`
       );
       setFeed(data);
+      setFilteredActivities(null);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -140,7 +143,18 @@ export default function DashboardPage() {
             <WeeklyStats stats={feed.stats} />
             <div>
               <h2 className="text-sm font-medium text-muted-foreground mb-3">Activity</h2>
-              <ActivityFeed activities={feed.activities} />
+              <SearchAndExport
+                activities={feed.activities}
+                onFilteredChange={setFilteredActivities}
+              />
+              <div className="mt-3">
+                <ActivityFeed activities={filteredActivities ?? feed.activities} />
+                {filteredActivities !== null && filteredActivities.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No activities match your search.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         ) : (
