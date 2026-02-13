@@ -9,6 +9,7 @@ interface SetupGuideProps {
 }
 
 type Tool = "claude-code" | "cursor" | "claude-desktop" | "codex";
+type SetupMethod = "terminal" | "manual";
 
 const TOOLS: { id: Tool; label: string }[] = [
   { id: "claude-code", label: "Claude Code" },
@@ -100,6 +101,17 @@ function getConfigPath(tool: Tool): { file: string; location: string } {
   }
 }
 
+function getTerminalCommand(tool: Tool, apiKey: string, projectId: string): string | null {
+  switch (tool) {
+    case "claude-code":
+      return `claude mcp add planbrew -e PLANBREW_API_KEY=${apiKey} -e PLANBREW_PROJECT_ID=${projectId} -- npx -y planbrew-mcp`;
+    case "codex":
+      return `codex --mcp-server planbrew="npx -y planbrew-mcp" --set-env planbrew:PLANBREW_API_KEY=${apiKey} --set-env planbrew:PLANBREW_PROJECT_ID=${projectId}`;
+    default:
+      return null;
+  }
+}
+
 function getContextFileInfo(tool: Tool): { file: string; description: string } | null {
   switch (tool) {
     case "claude-code":
@@ -115,12 +127,18 @@ function getContextFileInfo(tool: Tool): { file: string; description: string } |
 
 export function SetupGuide({ apiKey, projectId }: SetupGuideProps) {
   const [selectedTool, setSelectedTool] = useState<Tool>("claude-code");
+  const [setupMethod, setSetupMethod] = useState<SetupMethod>("terminal");
   const [testResult, setTestResult] = useState<"idle" | "loading" | "success" | "error">("idle");
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api/v1";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.planbrew.ai/api/v1";
   const mcpConfig = getMcpConfig(selectedTool, apiKey, projectId, apiUrl);
   const configPath = getConfigPath(selectedTool);
   const contextFile = getContextFileInfo(selectedTool);
+  const terminalCommand = getTerminalCommand(selectedTool, apiKey, projectId);
+
+  // Auto-switch to manual if tool has no terminal command
+  const hasTerminal = terminalCommand !== null;
+  const activeMethod = hasTerminal ? setupMethod : "manual";
 
   const trackingSnippet = `## PlanBrew - Project Memory
 
@@ -184,44 +202,80 @@ Use these proactively. Save progress as you go so future sessions can pick up se
         </div>
       </div>
 
-      {/* Step 2: API Key */}
+      {/* Step 2: Install */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
             2
           </div>
-          <h3 className="font-semibold text-foreground">Your API Key</h3>
+          <h3 className="font-semibold text-foreground">Install PlanBrew</h3>
         </div>
-        <CopyBlock label="Copy this key — you'll need it in the next step" content={apiKey} />
-      </div>
 
-      {/* Step 3: MCP Config */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-            3
+        {/* Method toggle — only show if tool supports terminal */}
+        {hasTerminal && (
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setSetupMethod("terminal")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activeMethod === "terminal"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
+              }`}
+            >
+              Terminal (recommended)
+            </button>
+            <button
+              onClick={() => setSetupMethod("manual")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activeMethod === "manual"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
+              }`}
+            >
+              Manual config
+            </button>
           </div>
-          <h3 className="font-semibold text-foreground">Add MCP Configuration</h3>
-        </div>
-        <p className="text-sm text-muted-foreground mb-1.5">
-          Add this to{" "}
-          <code className="px-1 py-0.5 rounded bg-card text-primary text-xs">{configPath.file}</code>
-          {" "}in {configPath.location}:
-        </p>
-        {selectedTool === "claude-desktop" && (
-          <p className="text-xs text-muted-foreground/70 mb-3">
-            Open Claude Desktop → Settings → Developer → Edit Config
-          </p>
         )}
-        <CopyBlock label="" content={mcpConfig} />
+
+        {activeMethod === "terminal" && terminalCommand ? (
+          <div>
+            <p className="text-sm text-muted-foreground mb-1.5">
+              Run this in your project directory:
+            </p>
+            <CopyBlock label="" content={terminalCommand} />
+            <p className="text-xs text-muted-foreground/70 mt-2">
+              That&apos;s it — your API key and project ID are already included.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Your API Key</p>
+              <CopyBlock label="" content={apiKey} />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-1.5">
+                Add this to{" "}
+                <code className="px-1 py-0.5 rounded bg-card text-primary text-xs">{configPath.file}</code>
+                {" "}in {configPath.location}:
+              </p>
+              {selectedTool === "claude-desktop" && (
+                <p className="text-xs text-muted-foreground/70 mb-3">
+                  Open Claude Desktop → Settings → Developer → Edit Config
+                </p>
+              )}
+              <CopyBlock label="" content={mcpConfig} />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Step 4: Context file (not for Claude Desktop) */}
+      {/* Step 3: Context file (not for Claude Desktop) */}
       {contextFile && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-              4
+              3
             </div>
             <h3 className="font-semibold text-foreground">
               Add to {contextFile.file}
@@ -236,11 +290,11 @@ Use these proactively. Save progress as you go so future sessions can pick up se
         </div>
       )}
 
-      {/* Step 5: Test */}
+      {/* Step 4: Test */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-            {contextFile ? 5 : 4}
+            {contextFile ? 4 : 3}
           </div>
           <h3 className="font-semibold text-foreground">Test Connection</h3>
         </div>
