@@ -22,10 +22,13 @@ export function formatRelativeTime(date: Date | string): string {
 
 export function getWeekRange(date: Date): { start: Date; end: Date } {
   const start = new Date(date);
-  start.setDate(start.getDate() - start.getDay() + 1); // Monday
+  const day = start.getDay();
+  // Monday as week start (Sunday getDay()=0 should go back to previous Monday)
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
-  end.setDate(end.getDate() + 4); // Friday
+  end.setDate(end.getDate() + 6); // Sunday
   end.setHours(23, 59, 59, 999);
   return { start, end };
 }

@@ -81,8 +81,12 @@ export default function DashboardPage() {
   const { start: weekStart, end: weekEnd } = getWeekRange(offsetDate);
   const canGoNext = weekOffset < 0;
 
-  const weekStartISO = weekStart.toISOString();
-  const weekEndISO = weekEnd.toISOString();
+  // Use local dates to avoid UTC shift issues
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const toLocalISO = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const weekStartISO = toLocalISO(weekStart);
+  const weekEndISO = toLocalISO(weekEnd);
 
   // Fetch activity feed
   const fetchFeed = useCallback(async () => {
